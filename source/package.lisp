@@ -17,20 +17,11 @@
                           #:c-fun/rc)
   (:shadowing-import-from :hu.dwim.mosquitto
                           #:c-fun/not-null)
+  (:local-nicknames
+   (#:bluez :hu.dwim.bluez)
+   (#:bluez.ffi :hu.dwim.bluez.ffi)
+   (#:mosquitto :hu.dwim.mosquitto))
   (:readtable-setup
    (hu.dwim.syntax-sugar:enable-sharp-boolean-syntax)
    (hu.dwim.syntax-sugar:enable-readtime-wrapper-syntax)
    (hu.dwim.syntax-sugar:enable-feature-cond-syntax)))
-
-(in-package :bt-mqtt-gateway)
-
-(defun ensure-package-nickname (package nickname)
-  (let ((nickname (string nickname))
-        (nicknames (package-nicknames package)))
-    (unless (member nickname nicknames :test 'equal)
-      (pushnew nickname nicknames)
-      (rename-package package package nicknames))
-    nicknames))
-
-(ensure-package-nickname :hu.dwim.bluez :bluez)
-(ensure-package-nickname :hu.dwim.bluez.ffi :bluez.ffi)
