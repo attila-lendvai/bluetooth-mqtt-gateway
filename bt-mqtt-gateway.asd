@@ -7,6 +7,7 @@
   :depends-on (:iolib
                :hu.dwim.bluez
                :hu.dwim.def+hu.dwim.common
+               :hu.dwim.mosquitto
                :hu.dwim.syntax-sugar)
   :components ((:module "source"
                 :components ((:file "main" :depends-on ("package"))

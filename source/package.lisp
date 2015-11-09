@@ -15,6 +15,8 @@
   (:export)
   (:shadowing-import-from :hu.dwim.bluez
                           #:c-fun/rc)
+  (:shadowing-import-from :hu.dwim.mosquitto
+                          #:c-fun/not-null)
   (:readtable-setup
    (hu.dwim.syntax-sugar:enable-sharp-boolean-syntax)
    (hu.dwim.syntax-sugar:enable-readtime-wrapper-syntax)
