@@ -34,6 +34,10 @@ LISP=`readlink -f ${LISP}`
 
 cd "${SCRIPT_DIR}"
 
+if [ -z "${DWIM_WORKSPACE}" ]; then
+  DWIM_WORKSPACE=${SCRIPT_DIR}/../../
+fi
+
 echo "*** "`date`" Building '${DWIM_PROJECT_NAME}' from workspace '${DWIM_WORKSPACE}'"
 
 BUILD_LOG_FILE="${DWIM_EXECUTABLE_CORE_FILE}.build-log"
@@ -50,7 +54,7 @@ export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (\"${DWIM_WORKSPACE}\" (\
 rm "${DWIM_EXECUTABLE_CORE_FILE}.new"
 
 # "call" the lisp part below
-exec ${LISP} --dynamic-space-size "${DWIM_MAXIMUM_MEMORY_SIZE}" --end-runtime-options --no-sysinit --no-userinit --script "$0" --end-toplevel-options 2>&1 | tee ${BUILD_LOG_FILE}
+exec ${LISP} --dynamic-space-size "${DWIM_MAXIMUM_MEMORY_SIZE}" --end-runtime-options --no-sysinit --no-userinit --eval "(require :asdf)" --eval "(asdf:load-system :asdf)" --script "$0" --end-toplevel-options 2>&1 | tee ${BUILD_LOG_FILE}
 
 chown ${DWIM_DAEMON_USER}:${DWIM_DAEMON_USER} "${DWIM_EXECUTABLE_CORE_FILE}.new"
 chmod o-rwx "${DWIM_EXECUTABLE_CORE_FILE}.new"
@@ -84,7 +88,9 @@ kill -INT $$
 (defun make-all-loaded-asdf-systems-immutable ()
   (let ((loaded-systems/name (asdf:already-loaded-systems)))
     ;; (format t "~%Making the following ASDF systems immutable:~%~A~%~%" loaded-systems/name)
-    (map nil 'asdf:register-immutable-system loaded-systems/name))
+    (map nil (lambda (el)
+               (setf (asdf/find-system::system-mutable-p el) t))
+         loaded-systems/name))
   (values))
 
 (pushnew 'make-all-loaded-asdf-systems-immutable uiop:*image-dump-hook*)

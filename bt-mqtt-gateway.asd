@@ -4,8 +4,7 @@
   :description "Various utilities, this is the most basic system that only introduce a small number of external dependencies."
   :entry-point "bt-mqtt-gateway::executable-toplevel"
   :build-pathname "bt-mqtt-gateway" ;; the base name of the executable
-  :depends-on (:iolib
-               :hu.dwim.bluez
+  :depends-on (:hu.dwim.bluez
                :hu.dwim.def+hu.dwim.common
                :hu.dwim.mosquitto
                :hu.dwim.syntax-sugar)
