@@ -1,10 +1,5 @@
 (in-package :bt-mqtt-gateway)
 
-(def function executable-toplevel ()
-  (test)
-  ;;+process-return-code/no-error+
-  0)
-
 (deftype fd ()
   '(integer 1))
 

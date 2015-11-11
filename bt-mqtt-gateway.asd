@@ -7,7 +7,12 @@
   :depends-on (:hu.dwim.bluez
                :hu.dwim.def+hu.dwim.common
                :hu.dwim.mosquitto
-               :hu.dwim.syntax-sugar)
+               :hu.dwim.syntax-sugar
+               :hu.dwim.util
+               :hu.dwim.util/command-line
+               :hu.dwim.util/error-handling+swank)
   :components ((:module "source"
-                :components ((:file "main" :depends-on ("package"))
-                             (:file "package")))))
+                :components ((:file "duplicates" :depends-on ("package"))
+                             (:file "main" :depends-on ("package" "duplicates"))
+                             (:file "package")
+                             (:file "server" :depends-on ("main"))))))

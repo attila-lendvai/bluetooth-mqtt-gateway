@@ -11,7 +11,8 @@
         :plus-c
         :hu.dwim.common
         :hu.dwim.def
-        :hu.dwim.syntax-sugar)
+        :hu.dwim.syntax-sugar
+        :hu.dwim.util)
   (:export)
   (:shadowing-import-from :hu.dwim.bluez
                           #:c-fun/rc)
