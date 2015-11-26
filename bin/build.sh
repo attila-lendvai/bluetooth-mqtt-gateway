@@ -88,9 +88,8 @@ kill -INT $$
 (defun make-all-loaded-asdf-systems-immutable ()
   (let ((loaded-systems/name (asdf:already-loaded-systems)))
     ;; (format t "~%Making the following ASDF systems immutable:~%~A~%~%" loaded-systems/name)
-    (map nil (lambda (el)
-               (setf (asdf/find-system::system-mutable-p el) t))
-         loaded-systems/name))
+    (mapcar 'asdf:register-immutable-system
+            loaded-systems/name))
   (values))
 
 (pushnew 'make-all-loaded-asdf-systems-immutable uiop:*image-dump-hook*)
