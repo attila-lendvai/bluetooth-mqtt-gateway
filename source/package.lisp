@@ -9,10 +9,13 @@
 (def package :bt-mqtt-gateway
   (:use :autowrap.minimal
         :plus-c
+        :hu.dwim.bluez/fancy
         :hu.dwim.common
         :hu.dwim.def
+        :hu.dwim.logger
         :hu.dwim.syntax-sugar
         :hu.dwim.util)
+  (:shadow #:log)
   (:export)
   (:shadowing-import-from :hu.dwim.bluez
                           #:c-fun/rc)
