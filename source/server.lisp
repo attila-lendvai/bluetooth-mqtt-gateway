@@ -30,9 +30,7 @@
             (sb-sys:enable-interrupt sb-unix:sigterm #'running-signal-handler)
             (sb-sys:enable-interrupt sb-unix:sigint #'running-signal-handler))
           (start-swank-server swank-port)
-          ;; TODO
-          (sleep 100000)
-          +process-return-code/no-error+)
+          (executable-toplevel/stage2))
       (abort nil
         :report (lambda (stream)
                   (format stream "Give up starting the image and quit the VM process with exit code 2"))

@@ -1,28 +1,8 @@
 #!/bin/sh
 #| -*- mode: lisp; coding: utf-8-unix -*-
 
-# this script assumes SBCL at multiple places. ideally it should use
-# cl-launch, but see Fare's thoughts below (from around 2014):
-#
-# Quick answer: cl-launch could help indeed, though it might need some love.
-#
-# A few things cl-launch 4 will do for you:
-# * abstract over implementation. More useful if you're on Windows or
-# ARM, where SBCL support is not as good and you'll want CCL instead.
-# * manage the painful loading of asdf and uiop and quicklisp — note
-# that any version of ASDF good enough for cl-launch 4 will have UIOP.
-# * let you easily specify --system hu.dwim.logger --system
-# maru+hu.dwim.logger --system swank --file setup.lisp, etc.
-# * (via UIOP) setup the debugger hooks, portably.
-#
-# Things it won't do (yet):
-# * support a non-standard quicklisp installation rather than the
-# builtin ~/quicklisp or ~/.quicklisp. It's a SMOP to add (see e.g. how
-# the source-registry is handled), but still has to be done. I believe
-# ${x#*=} is a standard enough shell construct that one could give an
-# argument to --quicklisp with --quicklisp=foo.
-# * same for output translation — though you can already export the
-# environment variable.
+# FIXME this script assumes SBCL at multiple places, but
+# ideally it should use cl-launch to abstract away the underlying lisp.
 
 . `dirname "$0"`/environment.sh
 
@@ -34,19 +14,19 @@ LISP=`readlink -f ${LISP}`
 
 cd "${SCRIPT_DIR}"
 
-if [ -z "${DWIM_WORKSPACE}" ]; then
-  DWIM_WORKSPACE=${SCRIPT_DIR}/../../
+if [ -z "${WORKSPACE}" ]; then
+  WORKSPACE=${SCRIPT_DIR}/../../
 fi
 
-echo "*** "`date`" Building '${DWIM_PROJECT_NAME}' from workspace '${DWIM_WORKSPACE}'"
+echo "*** "`date`" Building '${DWIM_PROJECT_NAME}' from workspace '${WORKSPACE}'"
 
 BUILD_LOG_FILE="${DWIM_EXECUTABLE_CORE_FILE}.build-log"
 
 export CL_SOURCE_REGISTRY="(:source-registry (:also-exclude \"sbcl\" \"disabled-systems\") \
-                                             (:tree \"${DWIM_WORKSPACE}\") \
+                                             (:tree \"${WORKSPACE}\") \
                                              (:tree \"/usr/local/share/common-lisp/source/\") \
                                              :ignore-inherited-configuration)"
-export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (\"${DWIM_WORKSPACE}\" (\"${DWIM_INSTALL_PATH}/.cache/common-lisp/\" :implementation)) :ignore-inherited-configuration)"
+export ASDF_OUTPUT_TRANSLATIONS="(:output-translations (\"${WORKSPACE}\" (\"${DWIM_INSTALL_PATH}/.cache/common-lisp/\" :implementation)) :ignore-inherited-configuration)"
 
 # i don't know how to convince program-op to overwrite the output, so delete from here...
 # a suggested alternative: (defmethod asdf:perform :before ((op asdf:program-op) (sys (eql (asdf:find-system :my-system)))) (uiop:delete-file-if-exists (asdf:output-file op sys)))

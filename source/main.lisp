@@ -16,9 +16,12 @@
         (append (bluez:parse-extended-inquiry-response (info :data &) (info :length))
                 (list :address (bluez:bdaddr->string (info :bdaddr))))))))
 
-(defun executable-toplevel ()
+(defun executable-toplevel/stage2 ()
+  (mosquitto:lib-init :minimum-version '(1 4 4))
+  (log.debug "Mosquitto lib version: ~A" (apply 'format nil "~D.~D.~D~%" (multiple-value-list (mosquitto:lib-version))))
   (main-loop)
   (format t "Exiting~%")
+  +process-return-code/no-error+)
   0)
 
 (defun main-loop ()
