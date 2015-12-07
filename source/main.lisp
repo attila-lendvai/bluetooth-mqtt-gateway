@@ -8,18 +8,32 @@
 
 (defun parse-le-advertising-event (buffer)
   (c-let ((event hu.dwim.bluez.ffi:evt-le-meta-event :from (cffi:inc-pointer (ptr buffer) (+ 1 bluez:+hci-event-hdr-size+))))
-    (when (eql (event :subevent)
-               bluez:+evt-le-advertising-report+)
-      ;;(print (ironclad:byte-array-to-hex-string (bluez::copy-sap-to-byte-vector (autowrap:ptr buffer) 45)))
-      ;;(terpri)
-      (c-let ((info bluez:le-advertising-info :from (cffi:inc-pointer (event :data &) 1)))
-        (append (bluez:parse-extended-inquiry-response (info :data &) (info :length))
-                (list :mac-address (bluez:bdaddr->string (info :bdaddr))))))))
+    (bind ((subevent-type (event :subevent)))
+      (case subevent-type
+        ;;(print (ironclad:byte-array-to-hex-string (bluez::copy-sap-to-byte-vector (autowrap:ptr buffer) 45)))
+        ;;(terpri)
+        (#.bluez:+evt-le-advertising-report+
+         (c-let ((info bluez:le-advertising-info :from (cffi:inc-pointer (event :data &) 1)))
+           (append (bluez:parse-extended-inquiry-response (info :data &) (info :length))
+                   (list :mac-address (bluez:bdaddr->string (info :bdaddr)))
+                   (list :rssi (cffi:mem-ref (ptr (info :data &))
+                                             :char
+                                             (info :length))))))
+        (t
+         (format t "Unknown subevent type: ~S" subevent-type))))))
+
+(defun print-event-info (buffer buffer-size)
+  (print (ironclad:byte-array-to-hex-string (bluez::copy-sap-to-byte-vector (autowrap:ptr buffer) buffer-size)))
+  (c-let ((event-header hu.dwim.bluez.ffi:hci-event-hdr :from (cffi:inc-pointer (ptr buffer) 1)))
+    (format t "Event type: ~A" (event-header :evt))))
 
 (defun executable-toplevel/stage2 ()
-  (mosquitto:lib-init :minimum-version '(1 4 4))
-  (log.debug "Mosquitto lib version: ~A" (apply 'format nil "~D.~D.~D~%" (multiple-value-list (mosquitto:lib-version))))
-  (main-loop)
+  (unwind-protect
+       (progn
+         (mosquitto:lib-init :minimum-version '(1 4 4))
+         (log.debug "Mosquitto lib version: ~A" (apply 'format nil "~D.~D.~D~%" (multiple-value-list (mosquitto:lib-version))))
+         (main-loop))
+    (mosquitto:lib-cleanup))
   (format t "Exiting~%")
   +process-return-code/no-error+)
 
@@ -29,27 +43,36 @@
   (declare (ignore client userdata))
   (mosquitto.debug "Callback: ~D ~S" level message))
 
-(def function hci/enable-le-scanning (socket)
+(def function hci/enable-le-scanning (socket &key all-events?)
   (c-fun/rc bluez:hci-le-set-scan-parameters socket 1 #x10 #x10 0 0 1000)
-  (c-fun/rc bluez:hci-le-set-scan-enable socket 1 1 1000)
   (c-with (;;(original-filter bluez:hci-filter)
            ;;(original-filter-struct-size bluez:socklen-t :value (autowrap:sizeof 'bluez:hci-filter))
            (new-filter bluez:hci-filter))
     ;; (format t "backing up the filter, (original-filter-struct-size &) ~S~%" (original-filter-struct-size &))
     ;; (c-fun/rc bluez:getsockopt socket bluez:+sol-hci+ bluez:+hci-filter+ (original-filter &) (original-filter-struct-size &))
     ;;(print (ironclad:byte-array-to-hex-string (bluez::copy-sap-to-byte-vector (autowrap:ptr original-filter) (autowrap:sizeof 'bluez:hci-filter))))
+    (when all-events?
+      ;; KLUDGE it's not ok this way, rename, refactor, etc
+      (setf (new-filter :event-mask 0) #xffffffff)
+      (setf (new-filter :event-mask 1) #xffffffff))
     (bluez:hci-filter/initialize-for-le-scanning new-filter)
     ;;(print (ironclad:byte-array-to-hex-string (bluez::copy-sap-to-byte-vector (autowrap:ptr new-filter) (autowrap:sizeof 'bluez:hci-filter))))
     (c-fun/rc bluez:setsockopt socket bluez:+sol-hci+ bluez:+hci-filter+ (new-filter &) (autowrap:sizeof 'bluez:hci-filter)))
+  (c-fun/rc bluez:hci-le-set-scan-enable socket 1 0 1000)
   (values))
 
 (def class* bluetooth-peer ()
   ((mac-address)
    (name)
-   (last-seen)))
+   (last-seen)
+   (rssi)))
 
 (def print-object (bluetooth-peer :identity nil)
-  (format t "mac ~A, name ~S" (mac-address-of -self-) (name-of -self-)))
+    (format t "mac: ~A, name: ~S, RSSI: ~A (~A sec)"
+            (mac-address-of -self-)
+            (name-of -self-)
+            (rssi-of -self-)
+            (- (bluetooth-time) (last-seen-of -self-))))
 
 (defun bluetooth-time ()
   (get-universal-time))
@@ -65,18 +88,22 @@
                    (getf event 'bluez:+eir-name-short+)
                    "(unknown)")))
     (assert mac-address)
-    (aif (gethash mac-address *bluetooth-peers*)
-         (setf (last-seen-of it) (bluetooth-time))
-         (bind ((bluetooth-peer (make-instance 'bluetooth-peer
-                                               :name name
-                                               :mac-address mac-address
-                                               :last-seen (bluetooth-time))))
-           (scanning.info "Noticed a new peer: ~A; ~A known peers" bluetooth-peer (bluetooth-peers/known-count))
-           #+nil
-           (with-open-hci-socket (socket :remote-device mac-address)
-             (hu.dwim.bluez.ffi:hci-le-create-conn ))
-           (setf (gethash mac-address *bluetooth-peers*)
-                 bluetooth-peer)))))
+    (flet ((update (bluetooth-peer)
+             (setf (last-seen-of bluetooth-peer) (bluetooth-time))
+             (setf (rssi-of bluetooth-peer) (getf event :rssi))))
+      (aif (gethash mac-address *bluetooth-peers*)
+           (update it)
+           (bind ((bluetooth-peer (make-instance 'bluetooth-peer
+                                                 :name name
+                                                 :mac-address mac-address)))
+             (update bluetooth-peer)
+             (scanning.info "Noticed a new peer: ~A; ~A known peers" bluetooth-peer (bluetooth-peers/known-count))
+             #+nil
+             (with-open-hci-socket (socket :remote-device "00:07:80:2D:EC:78")
+               (c-with ()
+                 (hu.dwim.bluez.ffi:hci-le-create-conn socket 4 4 0 bluez:+le-public-address+  bluez:+le-public-address+ #xf #xf 0 )))
+             (setf (gethash mac-address *bluetooth-peers*)
+                   bluetooth-peer))))))
 
 (def function map-registered-bluetooth-peers (visitor)
   (iter (for (nil bluetooth-peer) :in-hashtable *bluetooth-peers*)
@@ -93,8 +120,9 @@
                                               :tls-private-key (tls-data-file "9cc6b97024-private.pem.key"))
         (mosquitto:connect "A72KPY36W6QTP.iot.us-east-1.amazonaws.com" :port 8883)
         (with-hci-connection-context ()
-          (bind ((hci-connection (open-hci-connection :local-device "00:1A:7D:DA:71:13"
-                                                      ;; :local-device "hci2"
+          (bind ((hci-connection (open-hci-connection ;;:local-device "00:1A:7D:DA:71:13"
+                                                      :local-device "hci1"
+                                                      ;;:local-device "5C:F3:70:6A:0E:7F"
                                                       ;; :remote-device "00:07:80:2E:CB:43"
                                                       ))
                  ((:read-only-slots hci-device-id socket) hci-connection))
@@ -123,6 +151,7 @@
                   (cond
                     ((plusp bytes-read)
                      ;;(format t "~&Read ~S bytes " bytes-read)
+                     ;;(print-event-info (buffer &) bytes-read)
                      (bind ((event (parse-le-advertising-event (buffer &))))
                        (event/bluetooth-peer-noticed event)))
                     ((eql autowrap:errno bluez:+ewouldblock+)
