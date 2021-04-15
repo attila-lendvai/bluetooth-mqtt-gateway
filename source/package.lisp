@@ -7,8 +7,7 @@
 (in-package :hu.dwim.def)
 
 (def package :bt-mqtt-gateway
-  (:use :autowrap.minimal
-        :plus-c
+  (:use :alexandria
         :hu.dwim.bluez/fancy
         :hu.dwim.common
         :hu.dwim.def
@@ -18,9 +17,8 @@
   (:shadow #:log)
   (:export)
   (:shadowing-import-from :hu.dwim.bluez
-                          #:c-fun/rc)
-  (:shadowing-import-from :hu.dwim.mosquitto
-                          #:c-fun/not-null)
+                          #:c-fun/rc
+                          #:*errno*)
   (:local-nicknames
    (#:bluez :hu.dwim.bluez)
    (#:bluez.ffi :hu.dwim.bluez.ffi)
@@ -28,4 +26,5 @@
   (:readtable-setup
    (hu.dwim.syntax-sugar:enable-sharp-boolean-syntax)
    (hu.dwim.syntax-sugar:enable-readtime-wrapper-syntax)
-   (hu.dwim.syntax-sugar:enable-feature-cond-syntax)))
+   (hu.dwim.syntax-sugar:enable-feature-cond-syntax)
+   (hu.dwim.syntax-sugar:enable-case-preserving-syntax :packages '(:hu.dwim.bluez.ffi #+nil :hu.dwim.mosquitto.ffi))))
